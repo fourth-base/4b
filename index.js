@@ -17,6 +17,30 @@ function userExists(id) {
 r.connect({host: process.env.RETHINK_HOST, port: 28015, db: '4b'}, function(err, conn) {
     if (err) throw err;
     connection = conn;
+    r.table('sessions').changes().run(connection, function(err, cursor) {
+        if (err) throw err;
+        cursor.each(function(err, row) {
+            if (row.new_val.stage > 4) {
+                r.table('users').filter({session: row.new_val.id}).update({session:false}).run(connection, function(err, result) {
+                    if (err) throw err;
+                    console.log(result);
+                });
+                return;
+            }
+            if (row.new_val.voteCount > 1) {
+                r.table('sessions')
+                    .update({voteCount:0, stage: row.new_val.stage+1})
+                    .run(connection, function(err, result) {
+                        if (err) throw err;
+                        console.log(result);
+                    });
+                r.table('users').filter({session: row.new_val.id}).update({voted:false}).run(connection, function(err, result) {
+                    if (err) throw err;
+                    console.log(result);
+                });
+            }
+        });
+    });
     r.table('users').changes().run(connection, function(err, cursor) {
         if (err) throw err;
         cursor.each(function(err, row) {
@@ -29,6 +53,7 @@ r.connect({host: process.env.RETHINK_HOST, port: 28015, db: '4b'}, function(err,
             if (queue.length === 2) {
                 r.table('sessions').insert({
                     stage: 1,
+                    voteCount: 0
                 }).run(connection, function(err, result) {
                     if (err) throw err;
                     const sessionId = result.generated_keys[0];
