@@ -3,7 +3,9 @@ var users = horizon('users');
 var sessions = horizon('sessions');
 var currentState = {
     session : undefined,
-    stage : undefined
+    stage : undefined,
+    voted : false,
+    voteCount : 0
 };
 
 horizon
@@ -11,14 +13,16 @@ horizon
     .watch()
     .subscribe(
         user => {
+            currentState.voted = user.voted;
             if(user.session) {
                 currentState.session = sessions
-                                    .find(user.session)
-                                    .watch()
-                                    .subscribe(session => {
-                                        currentState.stage = session.stage;
-                                        console.log(JSON.stringify(session));
-                                    });
+                                        .find(user.session)
+                                        .watch()
+                                        .subscribe(session => {
+                                            currentState.stage = session.stage;
+                                            currentState.voteCount = session.voteCount;
+                                            console.log(JSON.stringify(session));
+                                        });
             } else {
                 if(currentState.session) {
                     currentState.session.unsubscribe();
@@ -29,3 +33,8 @@ horizon
             console.log(JSON.stringify(user));
         }
     );
+
+function userVote() {
+    horizon.currentUser().update({voted:true});
+    currentState.session.update({voteCount : currentState++});
+}
